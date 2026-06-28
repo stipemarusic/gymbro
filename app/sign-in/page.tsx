@@ -8,7 +8,7 @@ import { signIn, useSession } from "@/lib/auth/auth-client";
 import { queueFeedback } from "@/lib/feedback";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 export default function SignIn() {
     
