@@ -95,6 +95,127 @@ function session(workoutName, startedAt, duration, exercises) {
   }
 }
 
+function templateExercise(name, muscleGroup, sets) {
+  if (!muscleGroups.includes(muscleGroup)) {
+    throw new Error(`Invalid muscle group: ${muscleGroup}`)
+  }
+
+  return {
+    name,
+    muscleGroup,
+    sets,
+  }
+}
+
+function createDemoWorkoutTemplates() {
+  return [
+    {
+      name: "Push Day",
+      description: "Chest, shoulders, and triceps strength work.",
+      exercises: [
+        templateExercise("Bench Press", "Chest", [
+          { reps: 8, weight: 62.5 },
+          { reps: 8, weight: 65 },
+          { reps: 6, weight: 70 },
+        ]),
+        templateExercise("Incline Dumbbell Press", "Chest", [
+          { reps: 10, weight: 25 },
+          { reps: 9, weight: 25 },
+          { reps: 8, weight: 27.5 },
+        ]),
+        templateExercise("Shoulder Press", "Shoulders", [
+          { reps: 9, weight: 37.5 },
+          { reps: 8, weight: 40 },
+          { reps: 7, weight: 40 },
+        ]),
+        templateExercise("Triceps Pushdown", "Arms", [
+          { reps: 12, weight: 27.5 },
+          { reps: 12, weight: 30 },
+          { reps: 10, weight: 30 },
+        ]),
+      ],
+    },
+    {
+      name: "Pull Day",
+      description: "Back and arm training with heavy pulls.",
+      exercises: [
+        templateExercise("Deadlift", "Back", [
+          { reps: 5, weight: 100 },
+          { reps: 4, weight: 110 },
+          { reps: 3, weight: 115 },
+        ]),
+        templateExercise("Lat Pulldown", "Back", [
+          { reps: 10, weight: 57.5 },
+          { reps: 10, weight: 60 },
+          { reps: 8, weight: 62.5 },
+        ]),
+        templateExercise("Seated Row", "Back", [
+          { reps: 10, weight: 52.5 },
+          { reps: 9, weight: 55 },
+          { reps: 8, weight: 57.5 },
+        ]),
+        templateExercise("Hammer Curl", "Arms", [
+          { reps: 10, weight: 17.5 },
+          { reps: 10, weight: 20 },
+          { reps: 8, weight: 22.5 },
+        ]),
+      ],
+    },
+    {
+      name: "Leg Day",
+      description: "Squats, hinges, single-leg work, and calves.",
+      exercises: [
+        templateExercise("Back Squat", "Legs", [
+          { reps: 8, weight: 80 },
+          { reps: 6, weight: 85 },
+          { reps: 5, weight: 90 },
+        ]),
+        templateExercise("Romanian Deadlift", "Glutes", [
+          { reps: 9, weight: 72.5 },
+          { reps: 8, weight: 77.5 },
+          { reps: 8, weight: 80 },
+        ]),
+        templateExercise("Bulgarian Split Squat", "Legs", [
+          { reps: 10, weight: 20 },
+          { reps: 9, weight: 22.5 },
+          { reps: 8, weight: 25 },
+        ]),
+        templateExercise("Standing Calf Raise", "Legs", [
+          { reps: 15, weight: 50 },
+          { reps: 15, weight: 55 },
+          { reps: 12, weight: 60 },
+        ]),
+      ],
+    },
+    {
+      name: "Core + Glutes",
+      description: "Glute strength and core control.",
+      exercises: [
+        templateExercise("Hip Thrust", "Glutes", [
+          { reps: 10, weight: 90 },
+          { reps: 8, weight: 95 },
+          { reps: 6, weight: 100 },
+        ]),
+        templateExercise("Cable Crunch", "Core", [
+          { reps: 15, weight: 40 },
+          { reps: 14, weight: 42.5 },
+          { reps: 12, weight: 45 },
+        ]),
+        templateExercise("Ab Wheel Rollout", "Core", [
+          { reps: 10, weight: 0 },
+          { reps: 9, weight: 0 },
+          { reps: 8, weight: 0 },
+        ]),
+        templateExercise("Walking Lunge", "Legs", [
+          { reps: 12, weight: 20 },
+          { reps: 12, weight: 22.5 },
+          { reps: 10, weight: 22.5 },
+        ]),
+      ],
+    },
+  ]
+}
+
 function createDemoSessions() {
   return [
     session("Push Day", daysAgo(13, 18, 15), 3720, [
@@ -184,10 +305,58 @@ try {
   }
 
   const userId = String(demoUser.id || demoUser._id)
+  const workouts = db.collection("workouts")
+  const exercises = db.collection("exercises")
   const workoutSessions = db.collection("workoutsessions")
+  const demoWorkoutTemplates = createDemoWorkoutTemplates()
   const demoSessions = createDemoSessions()
+  let insertedWorkoutCount = 0
+  let skippedWorkoutCount = 0
+  let insertedExerciseCount = 0
   let insertedCount = 0
   let skippedCount = 0
+
+  for (const demoWorkout of demoWorkoutTemplates) {
+    const existingWorkout = await workouts.findOne({
+      userId,
+      name: demoWorkout.name,
+    })
+
+    if (existingWorkout) {
+      skippedWorkoutCount += 1
+      continue
+    }
+
+    const workoutId = new ObjectId()
+    const now = new Date()
+
+    await workouts.insertOne({
+      _id: workoutId,
+      userId,
+      name: demoWorkout.name,
+      description: demoWorkout.description,
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    insertedWorkoutCount += 1
+
+    const exerciseDocuments = demoWorkout.exercises.map((demoExercise) => ({
+      _id: new ObjectId(),
+      userId,
+      workoutId: String(workoutId),
+      name: demoExercise.name,
+      muscleGroup: demoExercise.muscleGroup,
+      sets: demoExercise.sets,
+      createdAt: now,
+      updatedAt: now,
+    }))
+
+    if (exerciseDocuments.length > 0) {
+      await exercises.insertMany(exerciseDocuments)
+      insertedExerciseCount += exerciseDocuments.length
+    }
+  }
 
   for (const demoSession of demoSessions) {
     const existingSession = await workoutSessions.findOne({
@@ -215,6 +384,9 @@ try {
   }
 
   console.log(`Demo seed complete for ${demoEmail}.`)
+  console.log(`Inserted ${insertedWorkoutCount} workout templates.`)
+  console.log(`Inserted ${insertedExerciseCount} workout template exercises.`)
+  console.log(`Skipped ${skippedWorkoutCount} existing workout templates.`)
   console.log(`Inserted ${insertedCount} completed workout sessions.`)
   console.log(`Skipped ${skippedCount} existing completed workout sessions.`)
   console.log("The script does not delete or update existing sessions.")
